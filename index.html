@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Stranger Math: La Batalla por Hawkins</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Rubik:wght@400;600;800&display=swap');
+
+    * {
+      touch-action: manipulation;
+      user-select: none;
+      -webkit-user-select: none;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100vw;
+      height: 100dvh;
+      overflow: hidden;
+      margin: 0;
+      padding: 0;
+      background-color: #050508;
+      font-family: 'Rubik', sans-serif;
+      color: #fff;
+    }
+
+    .font-retro {
+      font-family: 'Press Start 2P', cursive;
+    }
+
+    .stranger-title {
+      font-family: 'Press Start 2P', cursive;
+      color: #000;
+      text-shadow: 
+        -2px -2px 0 #ff1100, 
+         2px -2px 0 #ff1100,
+        -2px  2px 0 #ff1100,
+         2px  2px 0 #ff1100,
+         0 0 15px #ff1100,
+         0 0 30px #ff1100;
+      letter-spacing: 2px;
+    }
+
+    .btn-light {
+      transition: all 0.15s ease;
+      position: relative;
+    }
+
+    .btn-light:active {
+      transform: scale(0.96);
+    }
+
+    .slash-anim {
+      animation: slash 0.3s ease-out forwards;
+    }
+
+    @keyframes slash {
+      0% { opacity: 1; transform: scale(0.8) rotate(-10deg); }
+      50% { opacity: 1; transform: scale(1.1) rotate(5deg); }
+      100% { opacity: 0; transform: scale(1.2) rotate(10deg); }
+    }
+  </style>
+</head>
+<body class="flex flex-col h-full w-full relative">
+
+  <!-- Canvas de Fondo (Esporas Upside Down) -->
+  <canvas id="sporesCanvas" class="absolute inset-0 w-full h-full pointer-events-none z-0"></canvas>
+
+  <!-- Overlay de Efecto Zarpazo -->
+  <div id="slashOverlay" class="absolute inset-0 pointer-events-none z-40 flex items-center justify-center hidden">
+    <div class="slash-anim text-red-600 font-extrabold text-7xl md:text-9xl tracking-widest drop-shadow-[0_0_25px_rgba(255,0,0,1)]">
+      ✕ ✕ ✕
+    </div>
+  </div>
+
+  <!-- CONTENEDOR PRINCIPAL (100dvh sin scroll) -->
+  <main class="relative z-10 flex flex-col justify-between h-full w-full max-w-5xl mx-auto p-2 sm:p-4">
+
+    <!-- BARRA SUPERIOR / HUD -->
+    <header class="flex items-center justify-between bg-black/60 backdrop-blur border border-red-900/60 rounded-xl px-3 py-2 shadow-lg shrink-0">
+      <div class="flex items-center gap-2">
+        <span class="text-red-500 text-lg sm:text-xl font-bold">♥</span>
+        <div class="w-24 sm:w-36 bg-gray-900 rounded-full h-3 border border-red-900/80 overflow-hidden">
+          <div id="playerHealthBar" class="bg-gradient-to-r from-red-600 to-red-400 h-full transition-all duration-300" style="width: 100%;"></div>
+        </div>
+      </div>
+
+      <div class="text-center">
+        <span id="roundIndicator" class="font-retro text-xs sm:text-sm text-yellow-400 tracking-wider">RONDA 1 / 25</span>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <span class="font-retro text-xs text-purple-400">SCORE:</span>
+        <span id="scoreText" class="font-bold text-sm sm:text-base text-purple-300">0</span>
+      </div>
+    </header>
+
+    <!-- ÁREA CENTRAL: ZONA DEL DEMOGORGON -->
+    <section class="flex-1 flex flex-col items-center justify-center relative min-h-0 py-1">
+      <!-- Barra de vida del Demogorgon -->
+      <div class="w-full max-w-md bg-black/70 backdrop-blur rounded-lg border border-red-800 p-1.5 mb-1 text-center shrink-0">
+        <div class="flex justify-between items-center text-[10px] sm:text-xs font-retro text-red-400 mb-1 px-1">
+          <span>DEMOGORGON</span>
+          <span id="demoHpText">100 / 100 HP</span>
+        </div>
+        <div class="w-full bg-gray-950 rounded-full h-2.5 overflow-hidden border border-red-950">
+          <div id="demoHealthBar" class="bg-gradient-to-r from-red-700 via-red-500 to-yellow-500 h-full transition-all duration-300" style="width: 100%;"></div>
+        </div>
+      </div>
+
+      <!-- Canvas Animado del Demogorgon -->
+      <div class="relative w-full max-w-sm flex-1 min-h-0 flex items-center justify-center">
+        <canvas id="demogorgonCanvas" class="max-h-full max-w-full object-contain"></canvas>
+      </div>
+
+      <!-- Tarjeta de Operación Matemática -->
+      <div id="problemCard" class="w-full max-w-xl bg-black/80 border-2 border-red-600/80 rounded-xl p-2 sm:p-4 text-center shadow-[0_0_20px_rgba(239,68,68,0.3)] shrink-0 my-1">
+        <div class="text-xs sm:text-sm font-semibold text-red-400 uppercase tracking-widest mb-0.5">Calcula el ataque:</div>
+        <div id="mathProblem" class="text-2xl sm:text-4xl md:text-5xl font-extrabold tracking-wider text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.8)]">
+          3,5 × 10 = ?
+        </div>
+      </div>
+    </section>
+
+    <!-- PODERES DE LA PANDILLA -->
+    <section class="grid grid-cols-2 gap-2 max-w-xl mx-auto w-full mb-1 shrink-0">
+      <button id="btnPowerEleven" onclick="useElevenPower()" class="bg-pink-950/80 hover:bg-pink-900 border border-pink-500/50 rounded-lg p-1.5 flex flex-col items-center text-center transition">
+        <span class="text-base sm:text-lg">🧇</span>
+        <span class="text-[10px] sm:text-xs font-bold text-pink-300">Eleven 50/50</span>
+      </button>
+
+      <button id="btnPowerLucas" onclick="useLucasPower()" class="bg-yellow-950/80 hover:bg-yellow-900 border border-yellow-500/50 rounded-lg p-1.5 flex flex-col items-center text-center transition">
+        <span class="text-base sm:text-lg">🎯</span>
+        <span class="text-[10px] sm:text-xs font-bold text-yellow-300">Tirachinas</span>
+      </button>
+    </section>
+
+    <!-- PANEL DE RESPUESTAS (BOTONES LUCES NAVIDEÑAS) -->
+    <section id="optionsGrid" class="grid grid-cols-2 gap-2 sm:gap-3 max-w-xl mx-auto w-full shrink-0 mb-1">
+      <button onclick="checkAnswer(0)" id="opt0" class="btn-light bg-red-950/90 hover:bg-red-900 border-2 border-red-500 text-red-100 rounded-xl p-2.5 sm:p-4 text-lg sm:text-2xl font-bold flex items-center justify-between shadow-md">
+        <span class="bg-red-600 text-white rounded-full w-7 h-7 sm:w-9 sm:h-9 flex items-center justify-center text-xs sm:text-sm font-retro">A</span>
+        <span id="optText0" class="flex-1 text-center">35</span>
+      </button>
+
+      <button onclick="checkAnswer(1)" id="opt1" class="btn-light bg-blue-950/90 hover:bg-blue-900 border-2 border-blue-500 text-blue-100 rounded-xl p-2.5 sm:p-4 text-lg sm:text-2xl font-bold flex items-center justify-between shadow-md">
+        <span class="bg-blue-600 text-white rounded-full w-7 h-7 sm:w-9 sm:h-9 flex items-center justify-center text-xs sm:text-sm font-retro">B</span>
+        <span id="optText1" class="flex-1 text-center">350</span>
+      </button>
+
+      <button onclick="checkAnswer(2)" id="opt2" class="btn-light bg-yellow-950/90 hover:bg-yellow-900 border-2 border-yellow-500 text-yellow-100 rounded-xl p-2.5 sm:p-4 text-lg sm:text-2xl font-bold flex items-center justify-between shadow-md">
+        <span class="bg-yellow-600 text-white rounded-full w-7 h-7 sm:w-9 sm:h-9 flex items-center justify-center text-xs sm:text-sm font-retro">C</span>
+        <span id="optText2" class="flex-1 text-center">0,35</span>
+      </button>
+
+      <button onclick="checkAnswer(3)" id="opt3" class="btn-light bg-green-950/90 hover:bg-green-900 border-2 border-green-500 text-green-100 rounded-xl p-2.5 sm:p-4 text-lg sm:text-2xl font-bold flex items-center justify-between shadow-md">
+        <span class="bg-green-600 text-white rounded-full w-7 h-7 sm:w-9 sm:h-9 flex items-center justify-center text-xs sm:text-sm font-retro">D</span>
+        <span id="optText3" class="flex-1 text-center">3500</span>
+      </button>
+    </section>
+
+  </main>
+
+  <!-- MODAL INICIAL / CONFIGURACIÓN DE NIVELES -->
+  <div id="startModal" class="absolute inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="bg-gray-950 border-2 border-red-600 rounded-2xl max-w-md w-full p-5 text-center shadow-[0_0_35px_rgba(255,0,0,0.5)]">
+      <h1 class="stranger-title text-2xl sm:text-3xl mb-2">STRANGER MATH</h1>
+      <p class="text-xs sm:text-sm text-gray-300 mb-4">Multiplicación por la Unidad Seguida de Ceros (25 Rondas)</p>
+
+      <div class="space-y-3 text-left mb-5">
+        <div>
+          <label class="block text-xs font-bold text-red-400 mb-1">TIPO DE NÚMEROS:</label>
+          <select id="modeType" class="w-full bg-gray-900 border border-red-800 rounded-lg p-2 text-sm text-white font-semibold">
+            <option value="mixed">Decimales con coma y Enteros (Recomendado)</option>
+            <option value="decimal">Solo Decimales (ej. 3,5 × 100)</option>
+            <option value="integer">Solo Enteros (ej. 45 × 1000)</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-red-400 mb-1">MULTIPLICADORES:</label>
+          <select id="multType" class="w-full bg-gray-900 border border-red-800 rounded-lg p-2 text-sm text-white font-semibold">
+            <option value="all">Mezclar ×10, ×100 y ×1000</option>
+            <option value="10">Solo × 10</option>
+            <option value="100">Solo × 100</option>
+            <option value="1000">Solo × 1000</option>
+          </select>
+        </div>
+      </div>
+
+      <button id="btnStart" onclick="startGame()" class="w-full bg-red-600 hover:bg-red-500 active:bg-red-700 text-white font-retro text-sm sm:text-base py-3 px-6 rounded-xl border-2 border-red-300 shadow-[0_0_15px_rgba(255,0,0,0.8)] transition">
+        ¡COMENZAR BATALLA!
+      </button>
+    </div>
+  </div>
+
+  <!-- MODAL DE FEEDBACK / EXPLICACIÓN COMPLETA TRAS ERROR (ELEVEN) -->
+  <div id="feedbackModal" class="absolute inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+    <div class="bg-gray-950 border-2 border-red-500 rounded-2xl max-w-md w-full p-5 text-center shadow-[0_0_30px_rgba(239,68,68,0.5)]">
+      <div class="text-3xl mb-1">🧇 Eleven te corrige:</div>
+      <h3 class="text-lg font-bold text-yellow-400 mb-2">¡Revisa el cálculo!</h3>
+      <div id="feedbackBody" class="text-sm text-gray-200 mb-4 text-left leading-relaxed bg-gray-900/90 p-3 rounded-lg border border-gray-800">
+        Explicación detallada aquí...
+      </div>
+      <button onclick="closeFeedback()" class="w-full bg-red-600 hover:bg-red-500 text-white font-bold py-2.5 rounded-xl transition">
+        Siguiente ronda
+      </button>
+    </div>
+  </div>
+
+  <!-- MODAL DE FIN DE JUEGO / DIPLOMA HELLFIRE CLUB -->
+  <div id="gameOverModal" class="absolute inset-0 z-50 bg-black/95 flex items-center justify-center p-4 hidden">
+    <div class="bg-gray-950 border-4 border-yellow-500 rounded-2xl max-w-md w-full p-6 text-center shadow-[0_0_40px_rgba(234,179,8,0.5)]">
+      <div class="text-4xl mb-2">🔥 HELLFIRE CLUB 🔥</div>
+      <h2 id="finalTitle" class="text-xl font-retro text-yellow-400 mb-2">¡VICTORIA EN HAWKINS!</h2>
+      <p id="finalDesc" class="text-sm text-gray-300 mb-4">Has completado las 25 rondas del Del Revés.</p>
+
+      <div class="bg-gray-900 border border-yellow-600/50 rounded-xl p-4 mb-4 text-center">
+        <div class="text-xs text-yellow-500 uppercase tracking-widest mb-1">Puntuación Final</div>
+        <div id="finalScore" class="text-3xl font-extrabold text-white">0 Puntos</div>
+      </div>
+
+      <button onclick="restartGame()" class="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-extrabold py-3 rounded-xl transition font-retro text-xs sm:text-sm">
+        JUGAR DE NUEVO
+      </button>
+    </div>
+  </div>
+
+  <script>
+    // --- ESTADO Y CONFIGURACIÓN DEL JUEGO ---
+    const TOTAL_ROUNDS = 25;
+    let currentRound = 1;
+    let score = 0;
+    let playerHp = 100;
+    let demoHp = 100;
+    let currentProblem = null;
+    let powerUsedEleven = false;
+
+    // --- AUDIO SINTETIZADOR WEB AUDIO API ---
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    let audioCtx = null;
+
+    function playTone(freq, type, duration) {
+      try {
+        if (!audioCtx) audioCtx = new AudioCtx();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type || 'sine';
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+      } catch (e) {}
+    }
+
+    function soundCorrect() {
+      playTone(523.25, 'sine', 0.1);
+      setTimeout(() => playTone(659.25, 'sine', 0.15), 100);
+      setTimeout(() => playTone(783.99, 'triangle', 0.25), 200);
+    }
+
+    function soundWrong() {
+      playTone(200, 'sawtooth', 0.2);
+      setTimeout(() => playTone(140, 'sawtooth', 0.3), 150);
+    }
+
+    // --- GENERADOR DE EJERCICIOS MATEMÁTICOS ---
+    function generateProblem() {
+      const mode = document.getElementById('modeType').value;
+      const multOpt = document.getElementById('multType').value;
+
+      let mult = 10;
+      if (multOpt === 'all') {
+        const mults = [10, 100, 1000];
+        mult = mults[Math.floor(Math.random() * mults.length)];
+      } else {
+        mult = parseInt(multOpt);
+      }
+
+      let isDecimal = false;
+      if (mode === 'decimal') isDecimal = true;
+      else if (mode === 'integer') isDecimal = false;
+      else isDecimal = Math.random() < 0.6;
+
+      let num = 0;
+      if (isDecimal) {
+        const integerPart = Math.floor(Math.random() * 95) + 1;
+        const decimals = [1, 2, 5, 25, 75, 4, 8, 35, 125, 05, 004];
+        const decChoice = decimals[Math.floor(Math.random() * decimals.length)];
+        num = parseFloat(`${integerPart}.${decChoice}`);
+      } else {
+        num = Math.floor(Math.random() * 90) + 5;
+      }
+
+      const exactResult = num * mult;
+      const cleanResult = parseFloat(exactResult.toFixed(4));
+
+      const wrongOptions = new Set();
+      while (wrongOptions.size < 3) {
+        let fake = 0;
+        const r = Math.random();
+        if (r < 0.33) fake = cleanResult / 10;
+        else if (r < 0.66) fake = cleanResult * 10;
+        else fake = cleanResult + (Math.random() > 0.5 ? 10 : -5);
+
+        fake = parseFloat(fake.toFixed(4));
+        if (fake > 0 && fake !== cleanResult && !wrongOptions.has(fake)) {
+          wrongOptions.add(fake);
+        }
+      }
+
+      const allOptions = Array.from(wrongOptions);
+      const correctIdx = Math.floor(Math.random() * 4);
+      allOptions.splice(correctIdx, 0, cleanResult);
+
+      return {
+        num,
+        mult,
+        result: cleanResult,
+        options: allOptions,
+        correctIdx
+      };
+    }
+
+    function formatNumber(n) {
+      return n.toString().replace('.', ',');
+    }
+
+    function renderRound() {
+      currentProblem = generateProblem();
+      document.getElementById('mathProblem').innerText = `${formatNumber(currentProblem.num)} × ${currentProblem.mult} = ?`;
+
+      for (let i = 0; i < 4; i++) {
+        const btn = document.getElementById(`opt${i}`);
+        const txt = document.getElementById(`optText${i}`);
+        btn.disabled = false;
+        btn.style.opacity = "1";
+        txt.innerText = formatNumber(currentProblem.options[i]);
+      }
+
+      document.getElementById('roundIndicator').innerText = `RONDA ${currentRound} / ${TOTAL_ROUNDS}`;
+    }
+
+    // --- RESPUESTA DE USUARIO ---
+    function checkAnswer(idx) {
+      if (idx === currentProblem.correctIdx) {
+        soundCorrect();
+        score += 100;
+        document.getElementById('scoreText').innerText = score;
+        
+        demoHp = Math.max(0, demoHp - 4);
+        updateHealthBars();
+
+        nextRound();
+      } else {
+        soundWrong();
+        playerHp = Math.max(0, playerHp - 15);
+        updateHealthBars();
+        triggerSlashEffect();
+
+        showPedagogicalFeedback(currentProblem.num, currentProblem.mult, currentProblem.result);
+      }
+    }
+
+    function triggerSlashEffect() {
+      const overlay = document.getElementById('slashOverlay');
+      overlay.classList.remove('hidden');
+      setTimeout(() => overlay.classList.add('hidden'), 350);
+    }
+
+    function updateHealthBars() {
+      document.getElementById('playerHealthBar').style.width = `${playerHp}%`;
+      document.getElementById('demoHealthBar').style.width = `${demoHp}%`;
+      document.getElementById('demoHpText').innerText = `${demoHp} / 100 HP`;
+    }
+
+    function nextRound() {
+      if (currentRound >= TOTAL_ROUNDS || playerHp <= 0) {
+        endGame();
+      } else {
+        currentRound++;
+        renderRound();
+      }
+    }
+
+    // --- EXPLICACIÓN TRAS ERROR (ELEVEN MOSTRANDO SOLUCIÓN) ---
+    function showPedagogicalFeedback(num, mult, result) {
+      const zeros = mult === 10 ? 1 : (mult === 100 ? 2 : 3);
+      const strNum = num.toString();
+      const hasComma = strNum.includes('.');
+
+      let explanation = "";
+      if (hasComma) {
+        explanation = `Para multiplicar <b>${formatNumber(num)}</b> por <b>${mult}</b> (${zeros} cero${zeros > 1 ? 's' : ''}):<br><br>` +
+          `• Mueve la coma <b>${zeros} posición${zeros > 1 ? 'es' : ''} hacia la DERECHA</b>.<br>` +
+          `• El resultado correcto es <b class="text-green-400 text-lg">${formatNumber(result)}</b>.`;
+      } else {
+        explanation = `Para multiplicar el entero <b>${num}</b> por <b>${mult}</b> (${zeros} cero${zeros > 1 ? 's' : ''}):<br><br>` +
+          `• Añade <b>${zeros} cero${zeros > 1 ? 's' : ''} a la derecha</b> del número.<br>` +
+          `• El resultado correcto es <b class="text-green-400 text-lg">${formatNumber(result)}</b>.`;
+      }
+
+      document.getElementById('feedbackBody').innerHTML = explanation;
+      document.getElementById('feedbackModal').classList.remove('hidden');
+    }
+
+    function closeFeedback() {
+      document.getElementById('feedbackModal').classList.add('hidden');
+      nextRound();
+    }
+
+    // --- PODERES DE ELEVEN Y LUCAS ---
+    function useElevenPower() {
+      if (powerUsedEleven) return;
+      powerUsedEleven = true;
+      document.getElementById('btnPowerEleven').classList.add('opacity-40');
+
+      let removed = 0;
+      for (let i = 0; i < 4; i++) {
+        if (i !== currentProblem.correctIdx && removed < 2) {
+          const btn = document.getElementById(`opt${i}`);
+          btn.disabled = true;
+          btn.style.opacity = "0.2";
+          removed++;
+        }
+      }
+    }
+
+    function useLucasPower() {
+      soundCorrect();
+      demoHp = Math.max(0, demoHp - 15);
+      updateHealthBars();
+      document.getElementById('btnPowerLucas').classList.add('opacity-40');
+      document.getElementById('btnPowerLucas').onclick = null;
+    }
+
+    // --- INICIO Y FIN DEL JUEGO ---
+    function startGame() {
+      if (!audioCtx) audioCtx = new AudioCtx();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+
+      document.getElementById('startModal').classList.add('hidden');
+      currentRound = 1;
+      score = 0;
+      playerHp = 100;
+      demoHp = 100;
+      updateHealthBars();
+      renderRound();
+    }
+
+    function endGame() {
+      const isWin = playerHp > 0;
+      document.getElementById('finalTitle').innerText = isWin ? '¡VICTORIA EN HAWKINS!' : '¡EL DEMOGORGON TE HA CAPTURADO!';
+      document.getElementById('finalDesc').innerText = isWin ? 
+        `¡Felicidades! Has completado las 25 rondas y salvado Hawkins.` : 
+        `Te has quedado sin vida en la ronda ${currentRound}. ¡Inténtalo de nuevo!`;
+      document.getElementById('finalScore').innerText = `${score} Puntos`;
+      document.getElementById('gameOverModal').classList.remove('hidden');
+    }
+
+    function restartGame() {
+      document.getElementById('gameOverModal').classList.add('hidden');
+      document.getElementById('startModal').classList.remove('hidden');
+    }
+
+    // SOPORTE TECLADO (1, 2, 3, 4)
+    window.addEventListener('keydown', (e) => {
+      if (['1','2','3','4'].includes(e.key)) {
+        const idx = parseInt(e.key) - 1;
+        checkAnswer(idx);
+      }
+    });
+
+    // --- RENDERING CANVAS: ESPORAS Y DEMOGORGON REALISTA ---
+    const sporesCanvas = document.getElementById('sporesCanvas');
+    const sCtx = sporesCanvas.getContext('2d');
+
+    const demoCanvas = document.getElementById('demogorgonCanvas');
+    const dCtx = demoCanvas.getContext('2d');
+
+    let spores = [];
+
+    function resizeCanvases() {
+      sporesCanvas.width = window.innerWidth;
+      sporesCanvas.height = window.innerHeight;
+      
+      const p = demoCanvas.parentElement;
+      demoCanvas.width = p.clientWidth || 300;
+      demoCanvas.height = p.clientHeight || 250;
+    }
+
+    window.addEventListener('resize', resizeCanvases);
+    resizeCanvases();
+
+    for(let i=0; i<50; i++) {
+      spores.push({
+        x: Math.random() * window.innerWidth,
+        y: Math.random() * window.innerHeight,
+        r: Math.random() * 2 + 1,
+        sy: Math.random() * 0.5 + 0.2,
+        sx: (Math.random() - 0.5) * 0.3
+      });
+    }
+
+    let time = 0;
+    function renderLoop() {
+      time += 0.04;
+
+      // Dibujar esporas
+      sCtx.clearRect(0, 0, sporesCanvas.width, sporesCanvas.height);
+      sCtx.fillStyle = 'rgba(239, 68, 68, 0.4)';
+      spores.forEach(s => {
+        s.y -= s.sy;
+        s.x += s.sx;
+        if (s.y < 0) s.y = sporesCanvas.height;
+        if (s.x < 0) s.x = sporesCanvas.width;
+        if (s.x > sporesCanvas.width) s.x = 0;
+        sCtx.beginPath();
+        sCtx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+        sCtx.fill();
+      });
+
+      // Dibujar Demogorgon Animado
+      const w = demoCanvas.width;
+      const h = demoCanvas.height;
+      dCtx.clearRect(0, 0, w, h);
+
+      const cx = w / 2;
+      const cy = h / 2 + Math.sin(time * 2) * 4;
+
+      // Cuerpo
+      dCtx.fillStyle = '#1c1618';
+      dCtx.beginPath();
+      dCtx.ellipse(cx, cy + 50, 35, 60, 0, 0, Math.PI * 2);
+      dCtx.fill();
+
+      // Brazos
+      dCtx.strokeStyle = '#2d2226';
+      dCtx.lineWidth = 10;
+      dCtx.beginPath();
+      dCtx.moveTo(cx - 25, cy + 20);
+      dCtx.lineTo(cx - 65, cy + 50 + Math.sin(time * 3) * 8);
+      dCtx.moveTo(cx + 25, cy + 20);
+      dCtx.lineTo(cx + 65, cy + 50 - Math.sin(time * 3) * 8);
+      dCtx.stroke();
+
+      // Garganta central glowing
+      dCtx.fillStyle = '#ff1100';
+      dCtx.beginPath();
+      dCtx.arc(cx, cy, 18, 0, Math.PI * 2);
+      dCtx.fill();
+
+      // Pétalos de mandíbula (5 pétalos)
+      const openAmount = 0.8 + Math.sin(time * 3) * 0.2;
+      for (let i = 0; i < 5; i++) {
+        const angle = (i * Math.PI * 2 / 5) - Math.PI / 2;
+        dCtx.save();
+        dCtx.translate(cx, cy);
+        dCtx.rotate(angle);
+
+        // Pétalo de carne
+        dCtx.fillStyle = '#6b1116';
+        dCtx.beginPath();
+        dCtx.moveTo(0, 0);
+        dCtx.quadraticCurveTo(20 * openAmount, -30 * openAmount, 0, -65 * openAmount);
+        dCtx.quadraticCurveTo(-20 * openAmount, -30 * openAmount, 0, 0);
+        dCtx.fill();
+
+        // Dientes triangulares
+        dCtx.fillStyle = '#fff8e7';
+        for (let d = 15; d < 55; d += 10) {
+          dCtx.beginPath();
+          dCtx.arc(5, -d * openAmount, 2, 0, Math.PI * 2);
+          dCtx.arc(-5, -d * openAmount, 2, 0, Math.PI * 2);
+          dCtx.fill();
+        }
+
+        dCtx.restore();
+      }
+
+      requestAnimationFrame(renderLoop);
+    }
+
+    renderLoop();
+  </script>
+</body>
+</html>
